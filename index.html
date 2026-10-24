@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<meta name="description" content="OVY GRAPHIX — concours de création graphique entre membres.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>OVY GRAPHIX</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--tx:#12151c;--mu:#6b7280;--bd:#e2e5eb;--ac:#1d6bf3}
+:root[data-t=dark]{--bg:#0b0f17;--card:#121826;--tx:#e8ecf4;--mu:#8b95a8;--bd:#1f2937}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-top:env(safe-area-inset-top)}
+header{display:flex;align-items:center;gap:14px;padding:12px 18px;background:var(--card);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.logo{font-weight:800;letter-spacing:.14em;font-size:17px}.logo b{color:var(--ac)}
+nav{display:flex;gap:4px;flex:1;flex-wrap:wrap}nav a,button{font:inherit;cursor:pointer}
+nav a{padding:7px 12px;border-radius:8px;color:var(--mu);text-decoration:none}nav a.on{background:var(--ac);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:14px}
+h2{margin:0 0 4px;font-size:22px}h3{margin:0 0 6px}.mu{color:var(--mu);font-size:13px}
+.btn{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:600}.btn.g{background:transparent;color:var(--tx);border:1px solid var(--bd)}.btn.r{background:#c62828}
+input,textarea,select{width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit;margin:4px 0 8px}
+input[type=range]{padding:0;accent-color:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.sub img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;cursor:zoom-in;display:block;background:var(--bd)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{flex:1}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid var(--ac);color:var(--ac);margin-left:5px}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--bd);color:var(--mu)}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px 8px;border-bottom:1px solid var(--bd)}
+.pod{display:flex;align-items:flex-end;justify-content:center;gap:10px;margin:10px 0}.pod div{flex:1;max-width:170px;text-align:center;border-radius:10px 10px 0 0;padding:10px 6px;background:var(--bd)}
+.pod .p1{height:150px;background:var(--ac);color:#fff}.pod .p2{height:115px}.pod .p3{height:90px}
+#lb{position:fixed;inset:0;background:#000d;display:none;align-items:center;justify-content:center;z-index:20;padding:12px}#lb img{max-width:96vw;max-height:94vh}
+.au{max-width:380px;margin:8vh auto}canvas{position:fixed;inset:0;pointer-events:none;z-index:30}
+.notice{padding:10px 12px;border:1px solid var(--bd);border-radius:8px;margin:10px 0;color:var(--mu);font-size:13px}
+@media(max-width:520px){header{gap:8px;padding:10px}nav{order:3;flex-basis:100%}nav a{padding:7px 9px}main{padding:14px 10px 50px}.pod{gap:5px}.pod div{font-size:12px}}
+</style>
+</head>
+<body>
+<div id="app"></div><div id="lb" onclick="this.style.display='none'"><img id="lbi" alt="Aperçu agrandi"></div><canvas id="cv"></canvas>
+<script>
+'use strict';
+const ADMIN_EMAIL='jonathanandritiana@gmail.com', STORE_KEY='state-v2';
+let S={users:[],rounds:[]},me=localStorage.getItem('ovy_me')||null,view='defis',cur=null,mode='in';
+const $=s=>document.querySelector(s);
+const idb=()=>new Promise((resolve,reject)=>{const q=indexedDB.open('ovy-graphix',1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains('k'))q.result.createObjectStore('k')};q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)});
+async function load(){try{const d=await idb();return await new Promise((resolve,reject)=>{const q=d.transaction('k').objectStore('k').get(STORE_KEY);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}catch(e){console.error(e);return null}}
+async function save(){const d=await idb();await new Promise((resolve,reject)=>{const tx=d.transaction('k','readwrite');tx.objectStore('k').put(S,STORE_KEY);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const sha=async s=>{
+  // Web Crypto is available on HTTPS/localhost. This app should be run through a local server.
+  if(!crypto.subtle) throw new Error('Sécurité du navigateur indisponible. Ouvre le site via localhost ou HTTPS.');
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+};
+const uid=()=>crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2,12);
+const VB='<span class="chip" title="Administrateur">✓ Admin</span>';
+const U=i=>S.users.find(u=>u.id===i),ME=()=>U(me);
+const nm=u=>u?esc(u.name)+(u.admin?VB:'')+(u.badges||[]).map(b=>`<span class="chip">${esc(b)}</span>`).join(''):'Inconnu';
+const nv=s=>Object.keys(s.votes||{}).length,avg=s=>nv(s)?Object.values(s.votes).reduce((a,b)=>a+Number(b),0)/nv(s):0;
+const rank=r=>[...r.subs].sort((a,b)=>avg(b)-avg(a)||nv(b)-nv(a));
+const pts=id=>S.rounds.filter(r=>r.status==='closed').reduce((t,r)=>{const i=rank(r).findIndex(s=>s.uid===id);if(i>=0&&nv(rank(r)[i]))t+=([10,6,3][i]||1);return t},0);
+const lvl=p=>p>=30?'Légende':p>=15?'Maître':p>=5?'Créateur':'Novice';
+const IDEES=['Logo pour un café de nuit','Affiche de festival 2030','Pochette d’album fantôme','Mascotte d’une équipe de foot','Emballage d’un parfum','Icône d’application météo','Poster de science-fiction','Identité visuelle d’une librairie','Lettrage : votre prénom','Portrait en duotone'];
+const urls=new Map();
+function src(s){if(!s||!s.img)return '';if(!urls.has(s.id))urls.set(s.id,URL.createObjectURL(s.img));return urls.get(s.id)}
+function go(v,id){view=v;cur=id||null;render()}
+function render(){
+ const a=$('#app'),u=ME();
+ if(!u){a.innerHTML=`<div class="card au"><div class="logo" style="font-size:22px">OVY <b>GRAPHIX</b></div><p class="mu">Concours de design entre amis.</p><div class="notice">Première utilisation administrateur : choisis « Inscription », utilise l’adresse administrateur configurée dans le code, puis définis ton mot de passe. Cette adresse est acceptée automatiquement. Les autres membres restent en attente.</div>
+ ${mode==='up'?'<input id="n" placeholder="Nom d’affichage" autocomplete="name">':''}<input id="e" type="email" placeholder="Email" autocomplete="email"><input id="p" type="password" placeholder="Mot de passe (6 caractères minimum)" autocomplete="current-password"><div id="er" style="color:#c62828;margin-bottom:8px" role="alert"></div>
+ <button class="btn" onclick="auth()">${mode==='in'?'Connexion':'Créer mon compte'}</button> <button class="btn g" onclick="mode=mode==='in'?'up':'in';render()">${mode==='in'?'Inscription':'J’ai un compte'}</button></div>`;return}
+ if(!u.ok){a.innerHTML=`<div class="card au"><h3>Compte en attente</h3><p class="mu">L’administrateur doit valider ton accès.</p><button class="btn g" onclick="out()">Retour</button></div>`;return}
+ const T=[['defis','Défis'],['top','Classement'],['mem','Membres'],['me','Profil']];
+ a.innerHTML=`<header><div class="logo">OVY <b>GRAPHIX</b></div><nav>${T.map(t=>`<a href="#" class="${view===t[0]||view==='r'&&t[0]==='defis'?'on':''}" onclick="go('${t[0]}');return false">${t[1]}</a>`).join('')}</nav><button class="btn g" onclick="th()">Thème</button><button class="btn g" onclick="out()">Sortir</button></header><main>${V[view]?V[view]():V.defis()}</main>`;
+}
+const V={
+defis(){const u=ME();return`<h2>Défis</h2><p class="mu">Envoie tes créations, les membres votent de 0 à 10.</p>
+${u.admin?`<div class="card"><h3>Nouveau défi</h3><input id="t" maxlength="100" placeholder="Titre"><textarea id="b" rows="2" maxlength="1000" placeholder="Consigne"></textarea><div class="row"><button class="btn" onclick="mk()">Publier</button><button class="btn g" onclick="idee()">Thème surprise</button></div></div>`:''}
+${[...S.rounds].reverse().map(r=>`<div class="card"><div class="row"><div class="sp"><h3>${esc(r.title)}</h3><div class="mu">${esc(r.brief)}</div></div><span class="tag">${r.status==='open'?'Ouvert':'Terminé'} · ${r.subs.length} projets</span><button class="btn" onclick="go('r','${r.id}')">Ouvrir</button></div></div>`).join('')||'<p class="mu">Aucun défi pour le moment.</p>'}`},
+r(){const r=S.rounds.find(x=>x.id===cur),u=ME();if(!r)return'<p>Défi introuvable.</p>';const k=rank(r),open=r.status==='open';
+return`<button class="btn g" onclick="go('defis')">← Retour</button><h2 style="margin-top:12px">${esc(r.title)}</h2><p class="mu">${esc(r.brief)}</p>
+${!open&&k.length?`<div class="pod">${[1,0,2].filter(i=>k[i]).map(i=>`<div class="p${i===0?1:i===1?2:3}"><b>${i+1}</b><br>${nm(U(k[i].uid))}<br>${avg(k[i]).toFixed(1)}/10</div>`).join('')}</div>`:''}
+${open?`<div class="card"><h3>Ajouter une création</h3><input id="st" maxlength="100" placeholder="Titre (facultatif)"><input id="f" type="file" accept="image/*" multiple><p class="mu">Formats image uniquement. Évite les fichiers trop volumineux.</p><button class="btn" onclick="up('${r.id}')">Envoyer les créations</button><div id="upmsg" class="mu"></div></div>`:''}
+${u.admin&&open?`<button class="btn r" onclick="cl('${r.id}')">Clôturer et révéler le gagnant</button><br><br>`:''}
+<div class="grid">${(open?r.subs:k).map(s=>{const mine=s.uid===u.id;return`<div class="card sub"><img src="${src(s)}" alt="${esc(s.title)}" onclick="zoom('${s.id}')"><div class="row" style="margin-top:8px"><b class="sp">${esc(s.title||'Sans titre')}</b><span class="tag">${nv(s)} votes</span></div><div class="mu">${nm(U(s.uid))}</div>
+${!open||mine?`<div style="font-size:20px;font-weight:700;margin-top:4px">${avg(s).toFixed(1)}/10</div>`:''}
+${open&&!mine?`<input type="range" id="v${s.id}" min="0" max="10" step="0.5" value="${s.votes[u.id]??5}" oninput="this.nextElementSibling.textContent=this.value+'/10'"><div class="mu">${s.votes[u.id]??5}/10</div><button class="btn g" onclick="vote('${r.id}','${s.id}')">${s.votes[u.id]!=null?'Modifier mon vote':'Voter'}</button>`:''}
+${mine&&open?'<div class="mu">Ton projet : vote impossible</div>':''}</div>`}).join('')}</div>`},
+top(){const L=S.users.filter(u=>u.ok).map(u=>({u,p:pts(u.id)})).sort((a,b)=>b.p-a.p);return`<h2>Classement général</h2><p class="mu">Points par défi terminé : 1er 10, 2e 6, 3e 3, participation 1.</p><div class="card" style="overflow:auto"><table><tr><th>#</th><th>Membre</th><th>Niveau</th><th>Points</th></tr>${L.map((x,i)=>`<tr><td>${i+1}</td><td>${nm(x.u)}</td><td>${lvl(x.p)}</td><td><b>${x.p}</b></td></tr>`).join('')}</table></div>`},
+mem(){const u=ME();return`<h2>Membres</h2>${S.users.map(m=>`<div class="card"><div class="row"><div class="sp"><b>${nm(m)}</b><div class="mu">${esc(m.email)}${m.ok?'':' · en attente'}</div></div>${u.admin&&!m.admin?`${m.ok?'':`<button class="btn" onclick="ok('${m.id}')">Accepter</button>`}<input id="bg${m.id}" placeholder="Badge (ex. Designer)" style="width:160px;margin:0"><button class="btn g" onclick="bdg('${m.id}')">Donner</button><button class="btn g" onclick="rb('${m.id}')">Retirer</button>`:''}</div></div>`).join('')}`},
+me(){const u=ME(),p=pts(u.id);return`<div class="card"><h2>${nm(u)}</h2><div class="mu">${esc(u.email)}</div><p>Niveau : <b>${lvl(p)}</b> · ${p} points</p></div>`}
+};
+async function auth(){
+ const e=$('#e').value.trim().toLowerCase(),plain=$('#p').value,er=$('#er');er.textContent='';
+ if(!e||!plain){er.textContent='Renseigne ton email et ton mot de passe.';return}
+ if(mode==='up'&&plain.length<6){er.textContent='Le mot de passe doit contenir au moins 6 caractères.';return}
+ let p;try{p=await sha(plain)}catch(err){er.textContent=err.message;return}
+ const isAdminEmail=e===ADMIN_EMAIL.toLowerCase();
+ if(mode==='in'){
+   let u=S.users.find(x=>x.email===e&&x.pw===p);
+   if(!u){er.textContent='Identifiants incorrects. Si tu n’as pas encore créé ton compte, choisis Inscription.';return}
+   // Safety recovery for the configured admin account: always approve it.
+   if(isAdminEmail){u.admin=true;u.ok=true}
+   else if(u.admin && u.email!==ADMIN_EMAIL.toLowerCase()){u.admin=false}
+   me=u.id;
+   try{await save()}catch(err){er.textContent='Impossible de sauvegarder les données.';return}
+ }else{
+   const n=$('#n').value.trim();if(!n){er.textContent='Entre un nom d’affichage.';return}
+   let existing=S.users.find(x=>x.email===e);
+   if(existing){
+     // If the configured admin email already exists in a pending account, let its owner
+     // set the password during the registration flow and activate it immediately.
+     if(isAdminEmail){
+       existing.name=n||existing.name;
+       existing.pw=p;
+       existing.admin=true;
+       existing.ok=true;
+       existing.badges=existing.badges||[];
+       me=existing.id;
+     }else{
+       er.textContent='Email déjà utilisé. Connecte-toi avec ton mot de passe.';
+       return;
+     }
+   }else{
+     const u={id:uid(),name:n,email:e,pw:p,badges:[],admin:isAdminEmail,ok:isAdminEmail};
+     S.users.push(u);me=u.id;
+   }
+   try{await save()}catch(err){er.textContent='Impossible de sauvegarder les données dans ce navigateur.';return}
+ }
+ localStorage.setItem('ovy_me',me);render();
+}
+function out(){me=null;localStorage.removeItem('ovy_me');render()}
+function th(){const d=document.documentElement;d.dataset.t=d.dataset.t==='dark'?'light':'dark';localStorage.setItem('ovy_t',d.dataset.t)}
+async function mk(){const t=$('#t').value.trim();if(!t)return alert('Ajoute un titre.');S.rounds.push({id:uid(),title:t,brief:$('#b').value.trim(),status:'open',subs:[]});await save();render()}
+function idee(){$('#t').value=IDEES[Math.floor(Math.random()*IDEES.length)]}
+async function up(id){
+ const r=S.rounds.find(x=>x.id===id),files=[...($('#f').files||[])],msg=$('#upmsg');if(!files.length){msg.textContent='Choisis au moins une image.';return}
+ const images=files.filter(f=>f.type.startsWith('image/'));if(!images.length){msg.textContent='Choisis des fichiers image valides.';return}
+ const title=$('#st').value.trim();
+ for(const f of images){if(f.size>12*1024*1024){msg.textContent=`${f.name} dépasse 12 Mo et a été ignoré.`;continue}
+  r.subs.push({id:uid(),uid:me,title:title||f.name.replace(/\.[^.]+$/,''),img:f,votes:{}})}
+ try{await save();render()}catch(e){msg.textContent='Échec de sauvegarde. Essaie une image plus légère.';console.error(e)}
+}
+async function vote(rid,sid){const r=S.rounds.find(a=>a.id===rid),s=r?.subs.find(a=>a.id===sid),u=ME();if(!r||!s||!u||r.status!=='open'||s.uid===u.id)return; s.votes=s.votes||{};s.votes[me]=Math.max(0,Math.min(10,Number($('#v'+sid).value)));await save();render()}
+async function cl(id){if(!confirm('Clôturer ce défi ? Les votes ne seront plus modifiables.'))return;const r=S.rounds.find(x=>x.id===id);if(!r)return;r.status='closed';await save();render();boom()}
+async function ok(i){if(!ME()?.admin)return;const u=U(i);if(u){u.ok=true;await save();render()}}
+async function bdg(i){if(!ME()?.admin)return;const v=$('#bg'+i).value.trim();if(v){const u=U(i);u.badges=u.badges||[];u.badges.push(v);await save();render()}}
+async function rb(i){if(!ME()?.admin)return;const u=U(i);if(u?.badges?.length){u.badges.pop();await save();render()}}
+function zoom(id){const s=S.rounds.flatMap(r=>r.subs).find(x=>x.id===id);if(!s)return;$('#lbi').src=src(s);$('#lb').style.display='flex'}
+function boom(){const c=$('#cv'),x=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;const P=Array.from({length:140},()=>({x:Math.random()*c.width,y:-20,v:2+Math.random()*4,s:4+Math.random()*6,h:Math.random()*360}));let n=0;(function f(){x.clearRect(0,0,c.width,c.height);P.forEach(p=>{p.y+=p.v;x.fillStyle=`hsl(${p.h},80%,55%)`;x.fillRect(p.x,p.y,p.s,p.s)});if(++n<180)requestAnimationFrame(f);else x.clearRect(0,0,c.width,c.height)})()}
+(async()=>{document.documentElement.dataset.t=localStorage.getItem('ovy_t')||'light';S=(await load())||S;
+ // Normalize data created by older versions.
+ S.users.forEach(u=>{u.badges=u.badges||[]});S.rounds.forEach(r=>r.subs.forEach(s=>{s.votes=s.votes||{}}));
+ if('serviceWorker'in navigator&&location.protocol!=='file:'){try{await navigator.serviceWorker.register('./sw.js')}catch(e){console.warn('Service worker non enregistré',e)}}
+ render()})();
+</script>
+</body>
+</html>
